@@ -37,40 +37,10 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     {:eex,  "new/web/views/error_helpers.ex",                "web/views/error_helpers.ex"},
   ]
 
-  @brunch [
-    {:text, "static/brunch/.gitignore",       ".gitignore"},
-    {:eex,  "static/brunch/brunch-config.js", "brunch-config.js"},
-    {:eex,  "static/brunch/package.json",     "package.json"},
-    {:text, "static/app.css",                 "web/static/css/app.css"},
-    {:text, "static/phoenix.css",             "web/static/css/phoenix.css"},
-    {:eex,  "static/brunch/app.js",           "web/static/js/app.js"},
-    {:eex,  "static/brunch/socket.js",        "web/static/js/socket.js"},
-    {:text, "static/robots.txt",              "web/static/assets/robots.txt"},
-  ]
-
-  @html [
-    {:eex,  "new/test/controllers/page_controller_test.exs", "test/controllers/page_controller_test.exs"},
-    {:eex,  "new/test/views/layout_view_test.exs",           "test/views/layout_view_test.exs"},
-    {:eex,  "new/test/views/page_view_test.exs",             "test/views/page_view_test.exs"},
-    {:eex,  "new/web/controllers/page_controller.ex",        "web/controllers/page_controller.ex"},
-    {:eex,  "new/web/templates/layout/app.html.eex",         "web/templates/layout/app.html.eex"},
-    {:eex,  "new/web/templates/page/index.html.eex",         "web/templates/page/index.html.eex"},
-    {:eex,  "new/web/views/layout_view.ex",                  "web/views/layout_view.ex"},
-    {:eex,  "new/web/views/page_view.ex",                    "web/views/page_view.ex"},
-  ]
-
-  @bare [
-    {:text,   "static/bare/.gitignore", ".gitignore"},
-    {:text,   "static/app.css",         "priv/static/css/app.css"},
-    {:append, "static/phoenix.css",     "priv/static/css/app.css"},
-    {:text,   "static/bare/app.js",     "priv/static/js/app.js"},
-    {:text,   "static/robots.txt",      "priv/static/robots.txt"},
-  ]
-
   # Embed all defined templates
   root = Path.expand("../templates", __DIR__)
 
-  for {format, source, _} <- @new ++ @brunch ++ @html ++ @bare do
+  for {format, source, _} <- @new do
     unless format == :keep do
       @external_resource Path.join(root, source)
       def render(unquote(source)), do: unquote(File.read!(Path.join(root, source)))
@@ -82,9 +52,9 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   embed_text :phoenix_png, from_file: Path.expand("../../priv/static/phoenix.png", __DIR__)
   embed_text :phoenix_favicon, from_file: Path.expand("../../priv/static/favicon.ico", __DIR__)
 
-  @switches [dev: :boolean, brunch: :boolean,
+  @switches [dev: :boolean,
              app: :string, module: :string, database: :string,
-             binary_id: :boolean, html: :boolean]
+             binary_id: :boolean]
 
   def run([version]) when version in ~w(-v --version) do
     Mix.shell.info "Phoenix v#{@version}"
@@ -120,9 +90,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   end
 
   def run(app, mod, path, opts) do
-    db = Keyword.get(opts, :database, "postgres")
-    html = Keyword.get(opts, :html, true)
-    brunch = Keyword.get(opts, :brunch, true)
     phoenix_path = phoenix_path(path, Keyword.get(opts, :dev, false))
 
     # We lowercase the database name because according to the
@@ -131,7 +98,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     # some storages.
     pubsub_server = get_pubsub_server(mod)
     in_umbrella? = in_umbrella?(path)
-    brunch_deps_prefix = if in_umbrella?, do: "../../", else: ""
 
     binding = [application_name: app,
                application_module: mod,
@@ -143,81 +109,27 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
                prod_secret_key_base: random_string(64),
                signing_salt: random_string(8),
                in_umbrella: in_umbrella?,
-               brunch_deps_prefix: brunch_deps_prefix,
-               brunch: brunch,
-               html: html,
                hex?: Code.ensure_loaded?(Hex),
                namespaced?: Macro.camelize(app) != mod]
 
     copy_from path, binding, @new
-
-    # Optional contents
-    copy_static app, path, binding
-    copy_html   app, path, binding
 
     # Parallel installs
     install? = Mix.shell.yes?("\nFetch and install dependencies?")
 
     File.cd!(path, fn ->
       mix?    = install_mix(install?)
-      brunch? = install_brunch(install?)
       extra   = if mix?, do: [], else: ["$ mix deps.get"]
 
       print_mix_info(path, extra)
-
-      if not brunch? do
-        print_brunch_info()
-      end
     end)
   end
 
   defp switch_to_string({name, nil}), do: name
   defp switch_to_string({name, val}), do: name <> "=" <> val
 
-  defp copy_static(_app, path, binding) do
-    if binding[:brunch] == false do
-      copy_from path, binding, @bare
-      create_file Path.join(path, "priv/static/js/phoenix.js"), phoenix_js_text()
-      create_file Path.join(path, "priv/static/images/phoenix.png"), phoenix_png_text()
-      create_file Path.join(path, "priv/static/favicon.ico"), phoenix_favicon_text()
-    else
-      copy_from path, binding, @brunch
-      create_file Path.join(path, "web/static/assets/images/phoenix.png"), phoenix_png_text()
-      create_file Path.join(path, "web/static/assets/favicon.ico"), phoenix_favicon_text()
-    end
-  end
-
-  defp copy_html(_app, path, binding) do
-    if binding[:html] do
-      copy_from path, binding, @html
-    end
-  end
-
-  defp install_brunch(install?) do
-    maybe_cmd "npm install && node node_modules/brunch/bin/brunch build",
-              File.exists?("brunch-config.js"), install? && System.find_executable("npm")
-  end
-
   defp install_mix(install?) do
     maybe_cmd "mix deps.get", true, install? && Code.ensure_loaded?(Hex)
-  end
-
-  defp print_brunch_info do
-    Mix.shell.info """
-
-    Phoenix uses an optional assets build tool called brunch.io
-    that requires node.js and npm. Installation instructions for
-    node.js, which includes npm, can be found at http://nodejs.org.
-
-    After npm is installed, install your brunch dependencies by
-    running inside your app:
-
-        $ npm install
-
-    If you don't want brunch.io, you can re-run this generator
-    with the --no-brunch option.
-    """
-    nil
   end
 
   defp print_mix_info(path, extra) do
