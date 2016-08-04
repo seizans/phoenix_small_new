@@ -19,12 +19,6 @@ defmodule <%= application_module %>.ConnCase do
     quote do
       # Import conveniences for testing with connections
       use Phoenix.ConnTest
-<%= if ecto do %>
-      alias <%= application_module %>.Repo
-      import Ecto
-      import Ecto.Changeset
-      import Ecto.Query
-<% end %>
       import <%= application_module %>.Router.Helpers
 
       # The default endpoint for testing
@@ -33,14 +27,7 @@ defmodule <%= application_module %>.ConnCase do
   end
 
   setup tags do
-<%= if ecto do %>    <%= adapter_config[:test_setup] %>
-
-    unless tags[:async] do
-      <%= adapter_config[:test_async] %>
-    end
-<% else %>
     _ = tags
-<% end %>
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end
