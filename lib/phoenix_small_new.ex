@@ -47,13 +47,8 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     end
   end
 
-  # Embed missing files from Phoenix static.
-  embed_text :phoenix_js, from_file: Path.expand("../../priv/static/phoenix.js", __DIR__)
-  embed_text :phoenix_png, from_file: Path.expand("../../priv/static/phoenix.png", __DIR__)
-  embed_text :phoenix_favicon, from_file: Path.expand("../../priv/static/favicon.ico", __DIR__)
-
   @switches [dev: :boolean,
-             app: :string, module: :string, database: :string,
+             app: :string, module: :string,
              binary_id: :boolean]
 
   def run([version]) when version in ~w(-v --version) do
