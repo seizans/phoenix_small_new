@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Phoenix.New do
+defmodule Mix.Tasks.Phoenix.SmallNew do
   use Mix.Task
   import Mix.Generator
 
