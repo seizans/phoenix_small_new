@@ -1,5 +1,5 @@
 defmodule <%= application_module %>.Router do
-  use <%= application_module %>.Web, :router
+  use Phoenix.Router
 
   pipeline :api do
     plug :accepts, ["json"]
