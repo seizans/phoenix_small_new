@@ -8,6 +8,5 @@ config :<%= application_name %>, <%= application_module %>.Endpoint,
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
-<%= generator_config %>
 
 import_config "#{Mix.env}.exs"

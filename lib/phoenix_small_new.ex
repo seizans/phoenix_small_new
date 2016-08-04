@@ -16,25 +16,15 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     {:eex,  "new/config/test.exs",                           "config/test.exs"},
     {:eex,  "new/lib/application_name.ex",                   "lib/application_name.ex"},
     {:eex,  "new/lib/application_name/endpoint.ex",          "lib/application_name/endpoint.ex"},
-    {:keep, "new/test/channels",                             "test/channels"},
     {:keep, "new/test/controllers",                          "test/controllers"},
-    {:eex,  "new/test/views/error_view_test.exs",            "test/views/error_view_test.exs"},
     {:eex,  "new/test/support/conn_case.ex",                 "test/support/conn_case.ex"},
-    {:eex,  "new/test/support/channel_case.ex",              "test/support/channel_case.ex"},
     {:eex,  "new/test/test_helper.exs",                      "test/test_helper.exs"},
-    {:eex,  "new/web/channels/user_socket.ex",               "web/channels/user_socket.ex"},
     {:keep, "new/web/controllers",                           "web/controllers"},
-    {:keep, "new/web/models",                                "web/models"},
+    {:eex,  "new/web/controllers/page_controller.ex",        "web/controllers/page_controller.ex"},
     {:eex,  "new/web/router.ex",                             "web/router.ex"},
-    {:keep, "new/web/static/vendor",                         "web/static/vendor"},
-    {:eex,  "new/web/views/error_view.ex",                   "web/views/error_view.ex"},
     {:eex,  "new/web/web.ex",                                "web/web.ex"},
     {:eex,  "new/mix.exs",                                   "mix.exs"},
     {:eex,  "new/README.md",                                 "README.md"},
-    {:eex,  "new/web/gettext.ex",                            "web/gettext.ex"},
-    {:eex,  "new/priv/gettext/errors.pot",                   "priv/gettext/errors.pot"},
-    {:eex,  "new/priv/gettext/en/LC_MESSAGES/errors.po",     "priv/gettext/en/LC_MESSAGES/errors.po"},
-    {:eex,  "new/web/views/error_helpers.ex",                "web/views/error_helpers.ex"},
   ]
 
   # Embed all defined templates
@@ -87,19 +77,12 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   def run(app, mod, path, opts) do
     phoenix_path = phoenix_path(path, Keyword.get(opts, :dev, false))
 
-    # We lowercase the database name because according to the
-    # SQL spec, they are case insensitive unless quoted, which
-    # means creating a database like FoO is the same as foo in
-    # some storages.
-    pubsub_server = get_pubsub_server(mod)
     in_umbrella? = in_umbrella?(path)
 
     binding = [application_name: app,
                application_module: mod,
                phoenix_dep: phoenix_dep(phoenix_path),
                phoenix_path: phoenix_path,
-               phoenix_static_path: phoenix_static_path(phoenix_path),
-               pubsub_server: pubsub_server,
                secret_key_base: random_string(64),
                prod_secret_key_base: random_string(64),
                signing_salt: random_string(8),
@@ -202,19 +185,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     end
   end
 
-  defp kw_to_config(kw) do
-    Enum.map(kw, fn {k, v} ->
-      ",\n  #{k}: #{inspect v}"
-    end)
-  end
-
-  defp get_pubsub_server(module) do
-    module
-    |> String.split(".")
-    |> hd
-    |> Module.concat(PubSub)
-  end
-
   defp in_umbrella?(app_path) do
     try do
       umbrella = Path.expand(Path.join [app_path, "..", ".."])
@@ -235,9 +205,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   defp phoenix_dep("deps/phoenix"), do: ~s[{:phoenix, "~> 1.2.0"}]
   # defp phoenix_dep("deps/phoenix"), do: ~s[{:phoenix, github: "phoenixframework/phoenix", override: true}]
   defp phoenix_dep(path), do: ~s[{:phoenix, path: #{inspect path}, override: true}]
-
-  defp phoenix_static_path("deps/phoenix"), do: "deps/phoenix"
-  defp phoenix_static_path(path), do: Path.join("..", path)
 
   defp phoenix_path(path, true) do
     absolute = Path.expand(path)
