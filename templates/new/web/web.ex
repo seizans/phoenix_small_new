@@ -3,7 +3,6 @@ defmodule <%= application_module %>.Web do
     quote do
       use Phoenix.Controller<%= if namespaced? do %>, namespace: <%= application_module %><% end %>
       import <%= application_module %>.Router.Helpers
-      import <%= application_module %>.Gettext
     end
   end
 
