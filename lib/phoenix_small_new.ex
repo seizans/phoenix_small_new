@@ -37,14 +37,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     {:eex,  "new/web/views/error_helpers.ex",                "web/views/error_helpers.ex"},
   ]
 
-  @ecto [
-    {:eex,  "ecto/repo.ex",              "lib/application_name/repo.ex"},
-    {:keep, "ecto/test/models",          "test/models"},
-    {:eex,  "ecto/model_case.ex",        "test/support/model_case.ex"},
-    {:keep, "ecto/priv/repo/migrations", "priv/repo/migrations"},
-    {:eex,  "ecto/seeds.exs",            "priv/repo/seeds.exs"}
-  ]
-
   @brunch [
     {:text, "static/brunch/.gitignore",       ".gitignore"},
     {:eex,  "static/brunch/brunch-config.js", "brunch-config.js"},
@@ -78,7 +70,7 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   # Embed all defined templates
   root = Path.expand("../templates", __DIR__)
 
-  for {format, source, _} <- @new ++ @ecto ++ @brunch ++ @html ++ @bare do
+  for {format, source, _} <- @new ++ @brunch ++ @html ++ @bare do
     unless format == :keep do
       @external_resource Path.join(root, source)
       def render(unquote(source)), do: unquote(File.read!(Path.join(root, source)))
@@ -90,55 +82,7 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
   embed_text :phoenix_png, from_file: Path.expand("../../priv/static/phoenix.png", __DIR__)
   embed_text :phoenix_favicon, from_file: Path.expand("../../priv/static/favicon.ico", __DIR__)
 
-  @moduledoc """
-  Creates a new Phoenix project.
-
-  It expects the path of the project as argument.
-
-      mix phoenix.new PATH [--module MODULE] [--app APP]
-
-  A project at the given PATH will be created. The
-  application name and module name will be retrieved
-  from the path, unless `--module` or `--app` is given.
-
-  ## Options
-
-    * `--app` - the name of the OTP application
-
-    * `--module` - the name of the base module in
-      the generated skeleton
-
-    * `--database` - specify the database adapter for ecto.
-      Values can be `postgres`, `mysql`, `mssql`, or `mongodb`.
-      Defaults to `postgres`.
-
-    * `--no-brunch` - do not generate brunch files
-      for static asset building. When choosing this
-      option, you will need to manually handle
-      JavaScript dependencies if building HTML apps
-
-    * `--no-ecto` - do not generate ecto files for
-      the model layer
-
-    * `--no-html` - do not generate HTML views.
-
-    * `--binary-id` - use `binary_id` as primary key type
-      in ecto models
-
-  ## Examples
-
-      mix phoenix.new hello_world
-
-  Is equivalent to:
-
-      mix phoenix.new hello_world --module HelloWorld
-
-  Without brunch:
-
-      mix phoenix.new ~/Workspace/hello_world --no-brunch
-
-  """
-  @switches [dev: :boolean, brunch: :boolean, ecto: :boolean,
+  @switches [dev: :boolean, brunch: :boolean,
              app: :string, module: :string, database: :string,
              binary_id: :boolean, html: :boolean]
 
@@ -177,7 +121,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
 
   def run(app, mod, path, opts) do
     db = Keyword.get(opts, :database, "postgres")
-    ecto = Keyword.get(opts, :ecto, true)
     html = Keyword.get(opts, :html, true)
     brunch = Keyword.get(opts, :brunch, true)
     phoenix_path = phoenix_path(path, Keyword.get(opts, :dev, false))
@@ -186,28 +129,9 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     # SQL spec, they are case insensitive unless quoted, which
     # means creating a database like FoO is the same as foo in
     # some storages.
-    {adapter_app, adapter_module, adapter_config} = get_ecto_adapter(db, String.downcase(app), mod)
     pubsub_server = get_pubsub_server(mod)
     in_umbrella? = in_umbrella?(path)
     brunch_deps_prefix = if in_umbrella?, do: "../../", else: ""
-
-    adapter_config =
-      case Keyword.fetch(opts, :binary_id) do
-        {:ok, value} -> Keyword.put_new(adapter_config, :binary_id, value)
-        :error -> adapter_config
-      end
-
-
-    generator_config =
-      case get_generator_config(adapter_config) do
-        []               -> nil
-        generator_config ->
-          """
-
-          # Configure phoenix generators
-          config :phoenix, :generators#{kw_to_config(generator_config)}
-          """
-      end
 
     binding = [application_name: app,
                application_module: mod,
@@ -221,19 +145,13 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
                in_umbrella: in_umbrella?,
                brunch_deps_prefix: brunch_deps_prefix,
                brunch: brunch,
-               ecto: ecto,
                html: html,
-               adapter_app: adapter_app,
-               adapter_module: adapter_module,
-               adapter_config: adapter_config,
                hex?: Code.ensure_loaded?(Hex),
-               generator_config: generator_config,
                namespaced?: Macro.camelize(app) != mod]
 
     copy_from path, binding, @new
 
     # Optional contents
-    copy_model  app, path, binding
     copy_static app, path, binding
     copy_html   app, path, binding
 
@@ -247,10 +165,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
 
       print_mix_info(path, extra)
 
-      if binding[:ecto] do
-        print_ecto_info()
-      end
-
       if not brunch? do
         print_brunch_info()
       end
@@ -259,43 +173,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
 
   defp switch_to_string({name, nil}), do: name
   defp switch_to_string({name, val}), do: name <> "=" <> val
-
-  defp copy_model(_app, path, binding) do
-    if binding[:ecto] do
-      copy_from path, binding, @ecto
-
-      adapter_config = binding[:adapter_config]
-
-      append_to path, "config/dev.exs", """
-
-      # Configure your database
-      config :#{binding[:application_name]}, #{binding[:application_module]}.Repo,
-        adapter: #{inspect binding[:adapter_module]}#{kw_to_config adapter_config[:dev]},
-        pool_size: 10
-      """
-
-      append_to path, "config/test.exs", """
-
-      # Configure your database
-      config :#{binding[:application_name]}, #{binding[:application_module]}.Repo,
-        adapter: #{inspect binding[:adapter_module]}#{kw_to_config adapter_config[:test]}
-      """
-
-      append_to path, "config/prod.secret.exs", """
-
-      # Configure your database
-      config :#{binding[:application_name]}, #{binding[:application_module]}.Repo,
-        adapter: #{inspect binding[:adapter_module]}#{kw_to_config adapter_config[:prod]},
-        pool_size: 20
-      """
-    end
-  end
-
-  defp get_generator_config(adapter_config) do
-    adapter_config
-    |> Keyword.take([:binary_id, :migration, :sample_binary_id])
-    |> Enum.filter(fn {_, value} -> not is_nil(value) end)
-  end
 
   defp copy_static(_app, path, binding) do
     if binding[:brunch] == false do
@@ -341,14 +218,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     with the --no-brunch option.
     """
     nil
-  end
-
-  defp print_ecto_info do
-    Mix.shell.info """
-    Before moving on, configure your database in config/dev.exs and run:
-
-        $ mix ecto.create
-    """
   end
 
   defp print_mix_info(path, extra) do
@@ -424,41 +293,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     if File.dir?(name) && !Mix.shell.yes?("The directory #{name} already exists. Are you sure you want to continue?") do
       Mix.raise "Please select another directory for installation."
     end
-  end
-
-  defp get_ecto_adapter("mssql", app, module) do
-    {:tds_ecto, Tds.Ecto, db_config(app, module, "db_user", "db_password")}
-  end
-  defp get_ecto_adapter("mysql", app, module) do
-    {:mariaex, Ecto.Adapters.MySQL, db_config(app, module, "root", "")}
-  end
-  defp get_ecto_adapter("postgres", app, module) do
-    {:postgrex, Ecto.Adapters.Postgres, db_config(app, module, "postgres", "postgres")}
-  end
-  defp get_ecto_adapter("mongodb", app, module) do
-    {:mongodb_ecto, Mongo.Ecto,
-     dev:  [database: "#{app}_dev"],
-     test: [database: "#{app}_test", pool_size: 1],
-     prod: [database: "#{app}_prod"],
-     test_setup_all: "",
-     test_setup: "",
-     test_async: "Mongo.Ecto.truncate(#{module}.Repo, [])",
-     binary_id: true,
-     migration: false,
-     sample_binary_id: "111111111111111111111111"}
-  end
-  defp get_ecto_adapter(db, _app, _mod) do
-    Mix.raise "Unknown database #{inspect db}"
-  end
-
-  defp db_config(app, module, user, pass) do
-    [dev:  [username: user, password: pass, database: "#{app}_dev", hostname: "localhost"],
-     test: [username: user, password: pass, database: "#{app}_test", hostname: "localhost",
-            pool: Ecto.Adapters.SQL.Sandbox],
-     prod: [username: user, password: pass, database: "#{app}_prod"],
-     test_setup_all: "Ecto.Adapters.SQL.Sandbox.mode(#{module}.Repo, :manual)",
-     test_setup: ":ok = Ecto.Adapters.SQL.Sandbox.checkout(#{module}.Repo)",
-     test_async: "Ecto.Adapters.SQL.Sandbox.mode(#{module}.Repo, {:shared, self()})"]
   end
 
   defp kw_to_config(kw) do
