@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
 
   @phoenix Path.expand("../..", __DIR__)
   @version Mix.Project.config[:version]
-  @shortdoc "Creates a new Phoenix v#{@version} application"
+  @shortdoc "Creates a small new Phoenix v#{@version} application"
 
   # File mappings
 
@@ -22,7 +22,6 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
     {:keep, "new/web/controllers",                           "web/controllers"},
     {:eex,  "new/web/controllers/page_controller.ex",        "web/controllers/page_controller.ex"},
     {:eex,  "new/web/router.ex",                             "web/router.ex"},
-    {:eex,  "new/web/web.ex",                                "web/web.ex"},
     {:eex,  "new/mix.exs",                                   "mix.exs"},
     {:eex,  "new/README.md",                                 "README.md"},
   ]
@@ -61,7 +60,7 @@ defmodule Mix.Tasks.Phoenix.SmallNew do
 
     case argv do
       [] ->
-        Mix.Task.run "help", ["phoenix.new"]
+        Mix.Task.run "help", ["phoenix.small_new"]
       [path|_] ->
         app = opts[:app] || Path.basename(Path.expand(path))
         check_application_name!(app, !!opts[:app])
